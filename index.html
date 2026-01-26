@@ -103,12 +103,9 @@
 
     <!-- ==================== CONFIGURATION ==================== -->
     <script>
-        // Google Sheets Configuration
+        // Google Apps Script Configuration
         const CONFIG = {
-            API_KEY: 'AIzaSyDzqpYaf1BPBxGIirZREaqqqnql4poKqAQ',
-            SPREADSHEET_ID: '1EvMwt1NhqptXQUvAum3UDwOCTCUrCp7xhUgBrN7WERc',
-            WORKERS_SHEET: 'Workers',
-            WORK_ORDERS_SHEET: 'Work Orders'
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz8Fd0rXhgABSIPGU5EnnFoMFdxziisf8s6vr8Co0br_bV_11fNBO9_t-Mr3Z8d4bq4sA/exec'
         };
 
         // App State
@@ -119,7 +116,7 @@
             workers: [],
             workOrders: [],
             filteredOrders: [],
-            currentFilter: 'all'
+            currentFilter: 'pending'
         };
     </script>
 
@@ -343,65 +340,37 @@
 
     <!-- ==================== JAVASCRIPT ==================== -->
     <script>
-        // ===== Google Sheets API Functions =====
+        // ===== Apps Script API Functions =====
         
-        async function fetchSheetData(sheetName) {
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${sheetName}?key=${CONFIG.API_KEY}`;
+        async function callAppsScript(params) {
+            const url = new URL(CONFIG.APPS_SCRIPT_URL);
+            Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+            
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to fetch data');
-            const data = await response.json();
-            return data.values || [];
-        }
-
-        async function loadWorkers() {
-            const data = await fetchSheetData(CONFIG.WORKERS_SHEET);
-            if (data.length < 2) return [];
-            const headers = data[0];
-            return data.slice(1).map(row => ({
-                name: row[0] || '',
-                email: row[1] || '',
-                role: row[2] || ''
-            }));
+            return await response.json();
         }
 
         async function loadWorkOrders() {
             showLoadingState();
             try {
-                const data = await fetchSheetData(CONFIG.WORK_ORDERS_SHEET);
-                if (data.length < 2) {
-                    APP_STATE.workOrders = [];
+                const result = await callAppsScript({
+                    action: 'getWorkOrders',
+                    workerName: APP_STATE.workerName,
+                    role: APP_STATE.workerRole
+                });
+                
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+                
+                APP_STATE.workOrders = result.orders;
+                
+                if (APP_STATE.workOrders.length === 0) {
                     showEmptyState();
                     return;
                 }
                 
-                const headers = data[0];
-                APP_STATE.workOrders = data.slice(1).map((row, index) => ({
-                    rowIndex: index + 2,
-                    article: row[0] || '',
-                    image: row[1] || '',
-                    colour: row[2] || '',
-                    upperMaterial: row[3] || '',
-                    lining: row[4] || '',
-                    interlining: row[5] || '',
-                    counter: row[6] || '',
-                    buckleTie: row[7] || 'N',
-                    sizes: {
-                        '35/4': row[8] || 0,
-                        '36/5': row[9] || 0,
-                        '37/6': row[10] || 0,
-                        '38/7': row[11] || 0,
-                        '39/8': row[12] || 0,
-                        '40/9': row[13] || 0,
-                        '41/10': row[14] || 0,
-                        '42/11': row[15] || 0
-                    },
-                    total: row[16] || 0,
-                    upperman: row[17] || '',
-                    bottomMan: row[18] || '',
-                    workDone: row[19] === 'TRUE',
-                    paid: row[20] === 'TRUE'
-                }));
-
                 filterAndDisplayOrders();
             } catch (error) {
                 console.error('Error loading work orders:', error);
@@ -410,18 +379,7 @@
         }
 
         function filterAndDisplayOrders() {
-            const workerName = APP_STATE.workerName;
-            const workerRole = APP_STATE.workerRole;
-            
-            // Filter orders based on worker role
-            let orders = APP_STATE.workOrders.filter(order => {
-                if (workerRole === 'Upperman') {
-                    return order.upperman.toLowerCase() === workerName.toLowerCase();
-                } else if (workerRole === 'Bottom Man') {
-                    return order.bottomMan.toLowerCase() === workerName.toLowerCase();
-                }
-                return false;
-            });
+            let orders = APP_STATE.workOrders;
 
             // Apply status filter
             if (APP_STATE.currentFilter === 'pending') {
@@ -550,39 +508,45 @@
         // ===== Google Sign-In =====
         
         function loginWithGoogle() {
-            // For demo: Show a simple prompt
-            // In production, use Google OAuth
-            const email = prompt('Enter your registered email (e.g., mukesh@gmail.com):');
+            // Show login form
+            const email = prompt('Enter your registered email:');
             if (!email) return;
             
-            validateAndLogin(email.toLowerCase().trim());
+            const password = prompt('Enter your password (leave blank if none):') || '';
+            
+            validateAndLogin(email.toLowerCase().trim(), password);
         }
 
-        async function validateAndLogin(email) {
+        async function validateAndLogin(email, password) {
             try {
-                APP_STATE.workers = await loadWorkers();
-                const worker = APP_STATE.workers.find(w => w.email.toLowerCase() === email);
+                const result = await callAppsScript({
+                    action: 'login',
+                    email: email,
+                    password: password
+                });
                 
-                if (!worker) {
-                    showLoginError('Email not registered. Please contact admin.');
+                if (!result.success) {
+                    showLoginError(result.error);
                     return;
                 }
 
-                APP_STATE.currentUser = email;
+                const worker = result.worker;
+                
+                APP_STATE.currentUser = worker.email;
                 APP_STATE.workerName = worker.name;
                 APP_STATE.workerRole = worker.role;
 
                 // Update UI with user info
                 document.getElementById('welcomeName').textContent = worker.name;
                 document.getElementById('menuUserName').textContent = worker.name;
-                document.getElementById('menuUserEmail').textContent = email;
+                document.getElementById('menuUserEmail').textContent = worker.email;
                 document.getElementById('settingsUserName').textContent = worker.name;
-                document.getElementById('settingsUserEmail').innerHTML = `<span class="material-symbols-outlined text-sm">mail</span> ${email}`;
+                document.getElementById('settingsUserEmail').innerHTML = `<span class="material-symbols-outlined text-sm">mail</span> ${worker.email}`;
                 document.getElementById('settingsUserRole').textContent = worker.role;
 
                 // Save to localStorage
                 localStorage.setItem('factoryAppUser', JSON.stringify({
-                    email: email,
+                    email: worker.email,
                     name: worker.name,
                     role: worker.role
                 }));
@@ -634,15 +598,38 @@
         // ===== Mark Work Done =====
         
         async function markWorkDone(rowIndex, checked) {
-            // Note: To actually update the sheet, you need OAuth (not just API key)
-            // For now, we'll update locally and show a message
-            alert('Work marked as done! (Note: Sheet update requires OAuth setup)');
-            
-            // Update local state
-            const order = APP_STATE.workOrders.find(o => o.rowIndex === rowIndex);
-            if (order) {
-                order.workDone = checked;
+            try {
+                // Show loading indicator on the checkbox
+                const checkbox = document.querySelector(`[data-row="${rowIndex}"] input[type="checkbox"]`);
+                if (checkbox) checkbox.disabled = true;
+                
+                const result = await callAppsScript({
+                    action: 'markWorkDone',
+                    rowIndex: rowIndex,
+                    status: checked
+                });
+                
+                if (!result.success) {
+                    alert('Failed to update: ' + result.error);
+                    if (checkbox) {
+                        checkbox.checked = !checked;
+                        checkbox.disabled = false;
+                    }
+                    return;
+                }
+                
+                // Update local state
+                const order = APP_STATE.workOrders.find(o => o.rowIndex === rowIndex);
+                if (order) {
+                    order.workDone = checked;
+                }
+                
+                // Refresh the display
                 filterAndDisplayOrders();
+                
+            } catch (error) {
+                console.error('Error updating work status:', error);
+                alert('Failed to update. Check your internet connection.');
             }
         }
 
