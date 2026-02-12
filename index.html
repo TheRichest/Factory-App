@@ -41,7 +41,26 @@
 <body>
     <script>
         const CONFIG = { APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwPvYMrZ4MR3TH0UnvlVu32JIhBCRCjBnaikfQ1WTaBCfRuGhow90g48Bc0-X4dxavWjw/exec' };
-        let APP_STATE = { userType: null, currentUser: null, workerName: null, workerRole: null, workOrders: [], workers: [], expandedCard: null };
+        let APP_STATE = { userType: null, currentUser: null, workerName: null, workerRole: null, workOrders: [], workers: [], expandedCard: null, selectedLoginType: 'worker' };
+    </script>
+
+    <script>
+        // Login Type Selection
+        function selectLoginType(type) {
+            APP_STATE.selectedLoginType = type;
+            document.querySelectorAll('.login-tab').forEach(tab => {
+                tab.classList.remove('bg-white', 'text-primary', 'shadow-sm');
+                tab.classList.add('text-gray-500');
+            });
+            if (type === 'worker') {
+                document.getElementById('workerLoginTab').classList.add('bg-white', 'text-primary', 'shadow-sm');
+                document.getElementById('workerLoginTab').classList.remove('text-gray-500');
+            } else {
+                document.getElementById('adminLoginTab').classList.add('bg-white', 'text-primary', 'shadow-sm');
+                document.getElementById('adminLoginTab').classList.remove('text-gray-500');
+            }
+        }
+    </script>
     </script>
 
     <!-- LOGIN SCREEN -->
@@ -53,6 +72,21 @@
             <h1 class="text-3xl font-bold">FactoryConnect</h1>
             <p class="text-gray-500 mt-2">Factory Management</p>
         </div>
+        
+        <!-- Login Type Selection -->
+        <div class="w-full max-w-sm mb-6">
+            <div class="flex p-1 bg-gray-200 rounded-xl">
+                <button onclick="selectLoginType('worker')" id="workerLoginTab" class="login-tab flex-1 py-3 text-sm font-semibold rounded-lg bg-white text-primary shadow-sm flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-lg">person</span>
+                    Worker
+                </button>
+                <button onclick="selectLoginType('admin')" id="adminLoginTab" class="login-tab flex-1 py-3 text-sm font-semibold rounded-lg text-gray-500 flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-lg">admin_panel_settings</span>
+                    Admin
+                </button>
+            </div>
+        </div>
+        
         <div class="w-full max-w-sm space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -381,6 +415,8 @@
         async function handleLogin() {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const password = document.getElementById('loginPassword').value;
+            const loginType = APP_STATE.selectedLoginType;
+            
             if (!email || !password) { showLoginError('Enter email and password'); return; }
             
             document.getElementById('loginBtn').disabled = true;
@@ -388,8 +424,20 @@
             document.getElementById('loginError').classList.add('hidden');
             
             try {
-                const result = await callAPI({ action: 'login', email, password });
+                const result = await callAPI({ action: 'login', email, password, loginType });
                 if (!result.success) { showLoginError(result.error); resetLoginBtn(); return; }
+                
+                // Check if login type matches
+                if (loginType === 'admin' && result.userType !== 'admin') {
+                    showLoginError('This email is not registered as Admin');
+                    resetLoginBtn();
+                    return;
+                }
+                if (loginType === 'worker' && result.userType !== 'worker') {
+                    showLoginError('This email is not registered as Worker');
+                    resetLoginBtn();
+                    return;
+                }
                 
                 APP_STATE.userType = result.userType;
                 APP_STATE.currentUser = result.user;
