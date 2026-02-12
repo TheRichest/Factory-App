@@ -1,938 +1,758 @@
 <!DOCTYPE html>
-<html class="light" lang="en">
+<html lang="en">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
     <title>FactoryConnect</title>
-    
-    <!-- PWA Meta Tags -->
-    <meta name="description" content="Factory work order management app for workers">
     <meta name="theme-color" content="#0e715f">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="FactoryConnect">
-    
-    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
-    
-    <!-- App Icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com" rel="preconnect"/>
-    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-    <!-- Material Symbols -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
-    
-    <!-- Theme Config -->
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet"/>
     <script>
         tailwind.config = {
-            darkMode: "class",
             theme: {
                 extend: {
-                    colors: {
-                        "primary": "#0e715f",
-                        "primary-dark": "#0a5648",
-                        "background-light": "#f0f4f4",
-                        "background-dark": "#1a1c1e",
-                        "surface-light": "#ffffff",
-                        "surface-dark": "#2d3133",
-                        "text-main": "#0e1b18",
-                        "text-muted": "#5c6f6b",
-                    },
-                    fontFamily: {
-                        "display": ["Work Sans", "sans-serif"],
-                        "body": ["Work Sans", "sans-serif"],
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.5rem",
-                        "lg": "0.75rem",
-                        "xl": "1rem", 
-                        "2xl": "1.5rem",
-                        "full": "9999px"
-                    },
-                    boxShadow: {
-                        'soft': '0 4px 20px -2px rgba(14, 27, 24, 0.08)',
-                        'inner-strong': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
-                    }
-                },
-            },
+                    colors: { "primary": "#0e715f", "primary-dark": "#0a5648" },
+                    fontFamily: { "display": ["Work Sans", "sans-serif"] }
+                }
+            }
         }
     </script>
     <style>
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        .checkbox-wrapper input:checked + div { background-color: #0e715f; border-color: #0e715f; }
-        .checkbox-wrapper input:checked + div svg { opacity: 1; transform: scale(1); }
-
-        .menu-overlay { background-color: rgba(0, 0, 0, 0.5); opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        body { font-family: 'Work Sans', sans-serif; background: #f0f4f4; min-height: 100dvh; }
+        .screen.hidden { display: none !important; }
+        .menu-overlay { background: rgba(0,0,0,0.5); opacity: 0; visibility: hidden; transition: all 0.3s; }
         .menu-overlay.active { opacity: 1; visibility: visible; }
-        .slide-menu { transform: translateX(-100%); transition: transform 0.3s ease; }
+        .slide-menu { transform: translateX(-100%); transition: transform 0.3s; }
         .slide-menu.active { transform: translateX(0); }
-
-        .photo-modal { opacity: 0; visibility: hidden; transition: all 0.3s ease; }
-        .photo-modal.active { opacity: 1; visibility: visible; }
-
         .spinner { width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top-color: #0e715f; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        .lang-dropdown { opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all 0.2s ease; }
-        .lang-dropdown.active { opacity: 1; visibility: visible; transform: translateY(0); }
-
-        .screen.hidden { display: none !important; }
-
-        body { min-height: 100dvh; }
+        .expand-blur { filter: blur(3px); opacity: 0.5; pointer-events: none; }
+        .card-expanded { z-index: 30; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .modal-overlay { background: rgba(0,0,0,0.5); opacity: 0; visibility: hidden; transition: all 0.3s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .fab-menu { opacity: 0; visibility: hidden; transform: translateY(10px); transition: all 0.2s; }
+        .fab-menu.active { opacity: 1; visibility: visible; transform: translateY(0); }
     </style>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display text-text-main dark:text-gray-100 transition-colors duration-200 selection:bg-primary selection:text-white">
-
-    <!-- ==================== CONFIGURATION ==================== -->
+<body>
     <script>
-        // Google Apps Script Configuration
-        const CONFIG = {
-            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwPvYMrZ4MR3TH0UnvlVu32JIhBCRCjBnaikfQ1WTaBCfRuGhow90g48Bc0-X4dxavWjw/exec'
-        };
-
-        // App State
-        let APP_STATE = {
-            currentUser: null,
-            workerName: null,
-            workerRole: null,
-            workerEmail: null,
-            advanceBalance: 0,
-            workers: [],
-            workOrders: [],
-            filteredOrders: [],
-            currentFilter: 'pending',
-            paymentHistory: [],
-            selectedArticles: []
-        };
+        const CONFIG = { APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwPvYMrZ4MR3TH0UnvlVu32JIhBCRCjBnaikfQ1WTaBCfRuGhow90g48Bc0-X4dxavWjw/exec' };
+        let APP_STATE = { userType: null, currentUser: null, workerName: null, workerRole: null, workOrders: [], workers: [], expandedCard: null };
     </script>
 
-    <!-- ==================== LOGIN SCREEN ==================== -->
+    <!-- LOGIN SCREEN -->
     <div class="screen flex flex-col items-center justify-center min-h-screen p-6" id="loginScreen">
         <div class="text-center mb-8">
             <div class="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <span class="text-white text-4xl font-bold">FC</span>
             </div>
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">FactoryConnect</h1>
-            <p class="text-gray-500 dark:text-gray-400 mt-2">Worker Portal</p>
+            <h1 class="text-3xl font-bold">FactoryConnect</h1>
+            <p class="text-gray-500 mt-2">Factory Management</p>
         </div>
-        
-        <!-- Login Form -->
         <div class="w-full max-w-sm space-y-4">
-            <!-- Email Input -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email <span class="text-gray-400 font-normal">(e.g., mukesh@gmail.com)</span></label>
-                <div class="relative">
-                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">mail</span>
-                    <input 
-                        type="email" 
-                        id="loginEmail" 
-                        placeholder="mukesh@gmail.com"
-                        class="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-primary focus:outline-none transition-colors"
-                    />
-                </div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" id="loginEmail" placeholder="Enter email" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none"/>
             </div>
-            
-            <!-- Password Input -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password <span class="text-gray-400 font-normal">(e.g., 1234)</span></label>
-                <div class="relative">
-                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">lock</span>
-                    <input 
-                        type="password" 
-                        id="loginPassword" 
-                        placeholder="1234"
-                        class="w-full pl-11 pr-11 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-primary focus:outline-none transition-colors"
-                    />
-                    <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        <span class="material-symbols-outlined" id="passwordToggleIcon">visibility</span>
-                    </button>
-                </div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter password" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none"/>
             </div>
-            
-            <!-- Login Button -->
-            <button 
-                onclick="handleLogin()" 
-                id="loginButton"
-                class="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
-            >
-                <span id="loginButtonText">Sign In</span>
-                <div class="hidden" id="loginSpinner">
-                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                </div>
+            <button onclick="handleLogin()" id="loginBtn" class="w-full bg-primary text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
+                <span id="loginBtnText">Sign In</span>
+                <div class="hidden spinner w-5 h-5 border-2" id="loginSpinner"></div>
             </button>
-            
-            <!-- Login Error Message -->
-            <div class="hidden p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm text-center" id="loginError"></div>
+            <div class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm text-center" id="loginError"></div>
         </div>
-        
-        <p class="text-sm text-gray-400 mt-6">Contact admin if you don't have credentials</p>
     </div>
 
-    <!-- ==================== SLIDE-IN MENU ==================== -->
-    <div class="menu-overlay fixed inset-0 z-[60]" id="menuOverlay" onclick="toggleMenu()">
-        <div class="slide-menu absolute left-0 top-0 h-full w-72 bg-white dark:bg-surface-dark shadow-2xl flex flex-col" onclick="event.stopPropagation()">
+    <!-- ADMIN MENU -->
+    <div class="menu-overlay fixed inset-0 z-50" id="adminMenu" onclick="toggleAdminMenu()">
+        <div class="slide-menu absolute left-0 top-0 h-full w-72 bg-white shadow-2xl flex flex-col" onclick="event.stopPropagation()">
             <div class="bg-primary text-white px-5 py-6">
                 <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-2xl">menu</span>
-                    <span class="text-lg font-semibold">FactoryConnect</span>
+                    <span class="material-symbols-outlined">admin_panel_settings</span>
+                    <span class="text-lg font-semibold">Admin Panel</span>
                 </div>
-                <p class="text-sm mt-1 text-white/70">Worker Portal</p>
-            </div>
-            <div class="p-4 border-b border-gray-100 dark:border-gray-700">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span class="material-symbols-outlined text-primary text-2xl">person</span>
-                    </div>
-                    <div>
-                        <p class="font-semibold text-gray-900 dark:text-white" id="menuUserName">Worker</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400" id="menuUserEmail">worker@email.com</p>
-                    </div>
-                </div>
+                <p class="text-sm mt-1 text-white/70" id="adminMenuName">Admin</p>
             </div>
             <div class="p-3 flex-1">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2">Menu</p>
-                <button onclick="showScreen('dashboard'); toggleMenu();" class="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-4 text-gray-700 dark:text-gray-200 font-medium mb-1 transition-colors" id="menuDashboard">
-                    <span class="material-symbols-outlined text-xl">dashboard</span>
-                    Dashboard
+                <button onclick="showAdminPage('workOrders')" class="admin-menu-item w-full text-left px-4 py-3 rounded-xl flex items-center gap-4 font-medium mb-1 bg-primary/10 text-primary" data-page="workOrders">
+                    <span class="material-symbols-outlined">inventory_2</span> Work Orders
                 </button>
-                <button onclick="showScreen('payments'); toggleMenu();" class="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-4 text-gray-700 dark:text-gray-200 font-medium mb-1 transition-colors" id="menuPayments">
-                    <span class="material-symbols-outlined text-xl">payments</span>
-                    Payments
+                <button onclick="showAdminPage('workers')" class="admin-menu-item w-full text-left px-4 py-3 rounded-xl flex items-center gap-4 font-medium mb-1 hover:bg-gray-100" data-page="workers">
+                    <span class="material-symbols-outlined">group</span> Worker Details
                 </button>
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2 mt-4">System</p>
-                <button onclick="showScreen('settings'); toggleMenu();" class="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-4 text-gray-700 dark:text-gray-200 font-medium mb-1 transition-colors">
-                    <span class="material-symbols-outlined text-xl">settings</span>
-                    Settings
+                <button onclick="showAdminPage('payments')" class="admin-menu-item w-full text-left px-4 py-3 rounded-xl flex items-center gap-4 font-medium mb-1 hover:bg-gray-100" data-page="payments">
+                    <span class="material-symbols-outlined">payments</span> Payments
+                </button>
+                <button onclick="showAdminPage('articles')" class="admin-menu-item w-full text-left px-4 py-3 rounded-xl flex items-center gap-4 font-medium mb-1 hover:bg-gray-100" data-page="articles">
+                    <span class="material-symbols-outlined">category</span> Article Details
+                </button>
+                <button onclick="showAdminPage('settings')" class="admin-menu-item w-full text-left px-4 py-3 rounded-xl flex items-center gap-4 font-medium mb-1 hover:bg-gray-100" data-page="settings">
+                    <span class="material-symbols-outlined">settings</span> Settings
+                </button>
+            </div>
+            <div class="p-3 border-t">
+                <button onclick="logout()" class="w-full px-4 py-3 rounded-xl flex items-center gap-4 text-red-500 font-medium hover:bg-red-50">
+                    <span class="material-symbols-outlined">logout</span> Logout
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ==================== PHOTO MODAL ==================== -->
-    <div class="photo-modal fixed inset-0 z-[70] bg-black flex flex-col" id="photoModal" onclick="closePhoto()">
-        <div class="flex items-center justify-between p-4">
-            <button onclick="closePhoto()" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-                <span class="material-symbols-outlined">close</span>
+    <!-- ADMIN DASHBOARD -->
+    <div class="screen hidden min-h-screen" id="adminDashboard">
+        <header class="sticky top-0 z-40 bg-white border-b px-4 py-3 flex items-center justify-between">
+            <button onclick="toggleAdminMenu()" class="p-2 rounded-full hover:bg-gray-100">
+                <span class="material-symbols-outlined text-2xl">menu</span>
             </button>
-        </div>
-        <div class="flex-1 flex items-center justify-center p-4">
-            <img src="" alt="Product Photo" class="max-w-full max-h-full object-contain rounded-lg" id="modalPhoto">
-        </div>
-        <p class="p-4 text-center text-white/60 text-sm">Tap anywhere to close</p>
-    </div>
+            <h1 class="text-lg font-bold" id="adminPageTitle">Work Orders</h1>
+            <div class="w-10"></div>
+        </header>
 
-    <!-- ==================== VOICE NOTES SCREEN ==================== -->
-    <div class="screen hidden fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col" id="voiceScreen">
-        <header class="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-4">
-            <button onclick="showScreen('dashboard')" class="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors">
-                <span class="material-symbols-outlined text-2xl text-gray-700 dark:text-white">arrow_back</span>
-            </button>
-            <div class="flex-1">
-                <h1 class="font-semibold text-gray-900 dark:text-white">Chat with Admin</h1>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Voice Notes</p>
+        <!-- Work Orders Page -->
+        <div class="admin-page p-4" id="pageWorkOrders">
+            <div id="workOrdersList" class="space-y-3"></div>
+            <div class="hidden py-20 text-center" id="workOrdersEmpty">
+                <span class="material-symbols-outlined text-6xl text-gray-300">inventory_2</span>
+                <p class="text-gray-500 mt-4">No work orders</p>
             </div>
-        </header>
-        <div class="flex-1 flex items-center justify-center">
-            <p class="text-gray-500">Voice notes coming soon...</p>
+            <div class="hidden py-20 flex flex-col items-center" id="workOrdersLoading">
+                <div class="spinner"></div>
+                <p class="text-gray-500 mt-4">Loading...</p>
+            </div>
         </div>
-    </div>
 
-    <!-- ==================== SETTINGS SCREEN ==================== -->
-    <div class="screen hidden fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col" id="settingsScreen">
-        <header class="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-4">
-            <button onclick="showScreen('dashboard')" class="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors">
-                <span class="material-symbols-outlined text-2xl text-gray-700 dark:text-white">arrow_back</span>
-            </button>
-            <h1 class="font-semibold text-lg text-gray-900 dark:text-white">Settings</h1>
-        </header>
-        <div class="flex-1 overflow-y-auto p-4 space-y-4">
-            <div class="bg-white dark:bg-surface-dark rounded-2xl p-4 shadow-soft border border-gray-100 dark:border-gray-700">
+        <!-- Workers Page -->
+        <div class="admin-page hidden p-4" id="pageWorkers">
+            <div id="workersList" class="space-y-3"></div>
+            <div class="hidden py-20 text-center" id="workersEmpty">
+                <span class="material-symbols-outlined text-6xl text-gray-300">group</span>
+                <p class="text-gray-500 mt-4">No workers</p>
+            </div>
+        </div>
+
+        <!-- Payments Page -->
+        <div class="admin-page hidden p-4" id="pagePayments">
+            <div id="paymentsList" class="space-y-3"></div>
+        </div>
+
+        <!-- Articles Page -->
+        <div class="admin-page hidden p-4" id="pageArticles">
+            <div class="py-20 text-center">
+                <span class="material-symbols-outlined text-6xl text-gray-300">category</span>
+                <p class="text-gray-500 mt-4">Coming soon</p>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div class="admin-page hidden p-4" id="pageSettings">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border mb-4">
                 <div class="flex items-center gap-4">
                     <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                         <span class="material-symbols-outlined text-primary text-3xl">person</span>
                     </div>
                     <div>
-                        <p class="font-bold text-lg text-gray-900 dark:text-white" id="settingsUserName">Worker</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1" id="settingsUserEmail">
-                            <span class="material-symbols-outlined text-sm">mail</span>
-                            worker@email.com
-                        </p>
-                        <p class="text-xs text-primary font-medium mt-1" id="settingsUserRole">Role</p>
+                        <p class="font-bold text-lg" id="settingsAdminName">Admin</p>
+                        <p class="text-sm text-gray-500" id="settingsAdminEmail">admin@email.com</p>
                     </div>
                 </div>
             </div>
-            <div class="bg-white dark:bg-surface-dark rounded-2xl p-4 shadow-soft border border-gray-100 dark:border-gray-700">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="material-symbols-outlined text-xl text-primary">language</span>
-                        <span class="font-medium text-gray-900 dark:text-white">Language</span>
-                    </div>
-                    <div class="relative">
-                        <button onclick="toggleLangDropdown()" class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg text-gray-700 dark:text-gray-200" id="langButton">
-                            <span id="selectedLang">English</span>
-                            <span class="material-symbols-outlined text-sm">expand_more</span>
-                        </button>
-                        <div class="lang-dropdown absolute right-0 top-12 bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden min-w-[140px] z-10" id="langDropdown">
-                            <button onclick="selectLang('English')" class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between text-gray-700 dark:text-gray-200">
-                                English <span class="material-symbols-outlined text-primary text-sm lang-check">check</span>
-                            </button>
-                            <button onclick="selectLang('हिंदी')" class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between text-gray-700 dark:text-gray-200">
-                                हिंदी <span class="material-symbols-outlined text-primary text-sm lang-check hidden">check</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <button onclick="showAddAdminModal()" class="w-full p-4 text-left flex items-center gap-3 hover:bg-gray-50 border-b">
+                    <span class="material-symbols-outlined text-primary">person_add</span>
+                    <span class="font-medium">Add New Admin</span>
+                </button>
             </div>
-            <div class="bg-white dark:bg-surface-dark rounded-2xl shadow-soft border border-gray-100 dark:border-gray-700 overflow-hidden">
-                <button onclick="logout()" class="w-full p-4 text-center text-red-500 font-semibold hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined">logout</span>
-                    Logout
+        </div>
+
+        <!-- FAB Button -->
+        <button onclick="toggleFabMenu()" id="fabBtn" class="fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center z-40">
+            <span class="material-symbols-outlined text-2xl">add</span>
+        </button>
+        <div class="fab-menu fixed bottom-24 right-6 z-40" id="fabMenu">
+            <div class="bg-white rounded-xl shadow-lg border overflow-hidden">
+                <button onclick="showAddOrderModal()" class="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-gray-50 border-b">
+                    <span class="material-symbols-outlined text-primary">add_box</span>
+                    <span class="font-medium">Add Order</span>
+                </button>
+                <button onclick="alert('Coming soon!')" class="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-gray-50">
+                    <span class="material-symbols-outlined text-primary">upload_file</span>
+                    <span class="font-medium">Bulk Upload</span>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ==================== MAIN DASHBOARD ==================== -->
-    <div class="screen hidden pb-6" id="dashboardScreen">
-        <header class="sticky top-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3">
+    <!-- ADD ORDER MODAL -->
+    <div class="modal-overlay fixed inset-0 z-50 flex items-end justify-center" id="addOrderModal" onclick="closeAddOrderModal()">
+        <div class="bg-white w-full rounded-t-2xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
+                <h2 class="text-lg font-bold">Add Work Order</h2>
+                <button onclick="closeAddOrderModal()" class="p-2 hover:bg-gray-100 rounded-full">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Article</label>
+                        <input type="text" id="orderArticle" placeholder="L-1001" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none"/>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Colour</label>
+                        <input type="text" id="orderColour" placeholder="BLACK" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none"/>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Upper Material</label>
+                        <input type="text" id="orderUpper" placeholder="Leather" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none"/>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Lining</label>
+                        <input type="text" id="orderLining" placeholder="Cotton" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none"/>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Interlining</label>
+                        <input type="text" id="orderInterlining" placeholder="Foam" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none"/>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Counter</label>
+                        <input type="text" id="orderCounter" placeholder="Plastic" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none"/>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Buckle/Tie</label>
+                        <select id="orderBuckleTie" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none">
+                            <option value="N">No</option>
+                            <option value="Y">Yes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Rate ₹/pair</label>
+                        <input type="number" id="orderRate" placeholder="5" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none"/>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700">Sizes</label>
+                    <div class="grid grid-cols-4 gap-2 mt-1">
+                        <div class="text-center"><label class="text-xs text-gray-500">35/4</label><input type="number" id="size35" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                        <div class="text-center"><label class="text-xs text-gray-500">36/5</label><input type="number" id="size36" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                        <div class="text-center"><label class="text-xs text-gray-500">37/6</label><input type="number" id="size37" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                        <div class="text-center"><label class="text-xs text-gray-500">38/7</label><input type="number" id="size38" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                        <div class="text-center"><label class="text-xs text-gray-500">39/8</label><input type="number" id="size39" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                        <div class="text-center"><label class="text-xs text-gray-500">40/9</label><input type="number" id="size40" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                        <div class="text-center"><label class="text-xs text-gray-500">41/10</label><input type="number" id="size41" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                        <div class="text-center"><label class="text-xs text-gray-500">42/11</label><input type="number" id="size42" value="0" class="w-full px-2 py-1 border rounded text-center"/></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Upperman</label>
+                        <select id="orderUpperman" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none">
+                            <option value="">Not Assigned</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Bottom Man</label>
+                        <select id="orderBottomMan" class="w-full mt-1 px-3 py-2 border rounded-lg focus:border-primary focus:outline-none">
+                            <option value="">Not Assigned</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="saveWorkOrder()" class="w-full bg-primary text-white font-semibold py-3 rounded-xl">Save Order</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD ADMIN MODAL -->
+    <div class="modal-overlay fixed inset-0 z-50 flex items-center justify-center" id="addAdminModal" onclick="closeAddAdminModal()">
+        <div class="bg-white w-full max-w-sm mx-4 rounded-2xl" onclick="event.stopPropagation()">
+            <div class="border-b px-4 py-3 flex items-center justify-between">
+                <h2 class="text-lg font-bold">Add Admin</h2>
+                <button onclick="closeAddAdminModal()" class="p-2 hover:bg-gray-100 rounded-full">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div><label class="text-sm font-medium">Name</label><input type="text" id="newAdminName" class="w-full mt-1 px-3 py-2 border rounded-lg"/></div>
+                <div><label class="text-sm font-medium">Email</label><input type="email" id="newAdminEmail" class="w-full mt-1 px-3 py-2 border rounded-lg"/></div>
+                <div><label class="text-sm font-medium">Password</label><input type="text" id="newAdminPassword" class="w-full mt-1 px-3 py-2 border rounded-lg"/></div>
+                <button onclick="saveNewAdmin()" class="w-full bg-primary text-white font-semibold py-3 rounded-xl">Add Admin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKER MENU -->
+    <div class="menu-overlay fixed inset-0 z-50" id="workerMenu" onclick="toggleWorkerMenu()">
+        <div class="slide-menu absolute left-0 top-0 h-full w-72 bg-white shadow-2xl flex flex-col" onclick="event.stopPropagation()">
+            <div class="bg-primary text-white px-5 py-6">
+                <span class="text-lg font-semibold">FactoryConnect</span>
+                <p class="text-sm text-white/70">Worker Portal</p>
+            </div>
+            <div class="p-4 border-b">
+                <p class="font-semibold" id="workerMenuName">Worker</p>
+                <p class="text-sm text-gray-500" id="workerMenuEmail">email</p>
+            </div>
+            <div class="p-3 flex-1">
+                <button onclick="showWorkerPage('dashboard')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-100 flex items-center gap-4 font-medium">
+                    <span class="material-symbols-outlined">dashboard</span> Dashboard
+                </button>
+                <button onclick="showWorkerPage('payments')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-100 flex items-center gap-4 font-medium">
+                    <span class="material-symbols-outlined">payments</span> Payments
+                </button>
+            </div>
+            <div class="p-3 border-t">
+                <button onclick="logout()" class="w-full px-4 py-3 rounded-xl flex items-center gap-4 text-red-500 font-medium hover:bg-red-50">
+                    <span class="material-symbols-outlined">logout</span> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKER DASHBOARD -->
+    <div class="screen hidden" id="workerDashboard">
+        <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b px-4 py-3">
             <div class="flex items-center justify-between">
-                <button onclick="toggleMenu()" class="p-2 -ml-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors text-text-main dark:text-white">
-                    <span class="material-symbols-outlined text-3xl">menu</span>
+                <button onclick="toggleWorkerMenu()" class="p-2 rounded-full hover:bg-gray-100">
+                    <span class="material-symbols-outlined text-2xl">menu</span>
                 </button>
-                <div class="text-center">
-                    <h1 class="text-xl font-bold tracking-tight text-text-main dark:text-white">FactoryConnect</h1>
-                </div>
-                <button onclick="showScreen('voice')" class="relative p-2 -mr-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors text-text-main dark:text-white">
-                    <span class="material-symbols-outlined text-3xl">mic</span>
-                    <span class="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold px-1.5">2</span>
-                </button>
+                <h1 class="text-lg font-bold">FactoryConnect</h1>
+                <div class="w-10"></div>
             </div>
-            <p class="text-center text-sm text-text-muted dark:text-gray-400 mt-1">Welcome, <span id="welcomeName">Worker</span></p>
+            <p class="text-center text-sm text-gray-500 mt-1">Welcome, <span id="welcomeName">Worker</span></p>
         </header>
-
-        <!-- Filter Tabs -->
         <div class="px-4 py-4">
-            <div class="flex p-1 bg-gray-200/60 dark:bg-gray-800 rounded-xl overflow-hidden">
-                <button onclick="filterCards('all')" class="filter-btn flex-1 py-2.5 text-center text-sm font-semibold rounded-lg transition-all duration-200 text-gray-500" data-filter="all">All</button>
-                <button onclick="filterCards('pending')" class="filter-btn flex-1 py-2.5 text-center text-sm font-semibold rounded-lg transition-all duration-200 bg-white text-primary shadow-sm" data-filter="pending">Pending</button>
-                <button onclick="filterCards('done')" class="filter-btn flex-1 py-2.5 text-center text-sm font-semibold rounded-lg transition-all duration-200 text-gray-500" data-filter="done">Done</button>
+            <div class="flex p-1 bg-gray-200 rounded-xl">
+                <button onclick="filterWorkerOrders('all')" class="worker-filter flex-1 py-2 text-sm font-semibold rounded-lg text-gray-500" data-filter="all">All</button>
+                <button onclick="filterWorkerOrders('pending')" class="worker-filter flex-1 py-2 text-sm font-semibold rounded-lg bg-white text-primary shadow-sm" data-filter="pending">Pending</button>
+                <button onclick="filterWorkerOrders('done')" class="worker-filter flex-1 py-2 text-sm font-semibold rounded-lg text-gray-500" data-filter="done">Done</button>
             </div>
         </div>
-
-        <!-- Work Order Cards Container -->
-        <main class="px-4 space-y-4" id="cardContainer">
-            <!-- Cards will be dynamically inserted here -->
-        </main>
-
-        <!-- Empty State -->
-        <div class="hidden px-4 py-20 text-center" id="emptyState">
-            <span class="material-symbols-outlined text-6xl text-gray-300 mb-4">inventory_2</span>
-            <p class="text-gray-500 dark:text-gray-400 text-lg">No work orders assigned</p>
+        <main class="px-4 pb-6 space-y-4" id="workerOrdersList"></main>
+        <div class="hidden px-4 py-20 text-center" id="workerEmpty">
+            <span class="material-symbols-outlined text-6xl text-gray-300">inventory_2</span>
+            <p class="text-gray-500 mt-4">No work orders</p>
         </div>
-
-        <!-- Loading State -->
-        <div class="hidden px-4 py-20 flex flex-col items-center justify-center" id="loadingState">
+        <div class="hidden px-4 py-20 flex flex-col items-center" id="workerLoading">
             <div class="spinner"></div>
-            <p class="text-gray-500 dark:text-gray-400 mt-4">Loading work orders...</p>
-        </div>
-
-        <!-- Error State -->
-        <div class="hidden px-4 py-20 text-center" id="errorState">
-            <span class="material-symbols-outlined text-6xl text-red-300 mb-4">error</span>
-            <p class="text-gray-700 dark:text-gray-200 text-lg font-medium">Something went wrong</p>
-            <p class="text-gray-500 dark:text-gray-400 mt-1">Check your internet connection</p>
-            <button onclick="loadWorkOrders()" class="mt-4 px-6 py-2.5 bg-primary text-white font-semibold rounded-xl shadow-md hover:bg-primary-dark transition-colors">
-                Try Again
-            </button>
         </div>
     </div>
 
-    <!-- ==================== PAYMENTS SCREEN ==================== -->
-    <div class="screen hidden fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col" id="paymentsScreen">
-        <header class="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-4">
-            <button onclick="showScreen('dashboard')" class="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors">
-                <span class="material-symbols-outlined text-2xl text-gray-700 dark:text-white">arrow_back</span>
+    <!-- WORKER PAYMENTS -->
+    <div class="screen hidden fixed inset-0 z-50 bg-gray-100 flex flex-col" id="workerPayments">
+        <header class="bg-white border-b px-4 py-3 flex items-center gap-4">
+            <button onclick="showWorkerPage('dashboard')" class="p-2 rounded-full hover:bg-gray-100">
+                <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <h1 class="font-semibold text-lg text-gray-900 dark:text-white flex-1">Payments</h1>
+            <h1 class="font-semibold text-lg">Payments</h1>
         </header>
-        
-        <!-- Advance Balance Card -->
         <div class="p-4">
-            <div class="bg-gradient-to-r from-primary to-primary-dark rounded-2xl p-5 text-white shadow-lg">
-                <div class="flex items-center gap-3 mb-2">
-                    <span class="material-symbols-outlined text-2xl">account_balance_wallet</span>
-                    <span class="text-white/80 font-medium">Advance Balance</span>
-                </div>
-                <p class="text-3xl font-bold" id="advanceBalanceDisplay">₹0</p>
+            <div class="bg-gradient-to-r from-primary to-primary-dark rounded-2xl p-5 text-white">
+                <p class="text-white/80">Advance Balance</p>
+                <p class="text-3xl font-bold mt-1" id="workerAdvanceBalance">₹0</p>
             </div>
         </div>
-        
-        <!-- Payment History -->
         <div class="flex-1 overflow-y-auto px-4 pb-4">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Payment History</h2>
-            <div class="space-y-3" id="paymentHistoryContainer">
-                <!-- Payment cards will be inserted here -->
-            </div>
-            
-            <!-- Empty Payment State -->
-            <div class="hidden text-center py-10" id="emptyPaymentState">
-                <span class="material-symbols-outlined text-5xl text-gray-300 mb-3">receipt_long</span>
-                <p class="text-gray-500">No payment history yet</p>
-            </div>
-            
-            <!-- Payment Loading State -->
-            <div class="hidden flex flex-col items-center py-10" id="paymentLoadingState">
-                <div class="spinner"></div>
-                <p class="text-gray-500 mt-4">Loading payment history...</p>
-            </div>
+            <h2 class="text-sm font-semibold text-gray-500 uppercase mb-3">Payment History</h2>
+            <div class="space-y-3" id="workerPaymentsList"></div>
         </div>
     </div>
 
-    <!-- ==================== JAVASCRIPT ==================== -->
     <script>
-        // ===== Apps Script API Functions =====
-        
-        async function callAppsScript(params) {
+        // API Call
+        async function callAPI(params) {
             const url = new URL(CONFIG.APPS_SCRIPT_URL);
-            Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-            
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch data');
-            return await response.json();
+            Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+            const res = await fetch(url);
+            return await res.json();
         }
 
-        async function loadWorkOrders() {
-            showLoadingState();
-            try {
-                const result = await callAppsScript({
-                    action: 'getWorkOrders',
-                    workerName: APP_STATE.workerName,
-                    role: APP_STATE.workerRole
-                });
-                
-                if (!result.success) {
-                    throw new Error(result.error);
-                }
-                
-                APP_STATE.workOrders = result.orders;
-                
-                if (APP_STATE.workOrders.length === 0) {
-                    showEmptyState();
-                    return;
-                }
-                
-                filterAndDisplayOrders();
-            } catch (error) {
-                console.error('Error loading work orders:', error);
-                showErrorState();
-            }
-        }
-
-        function filterAndDisplayOrders() {
-            let orders = APP_STATE.workOrders;
-
-            // Apply status filter
-            if (APP_STATE.currentFilter === 'pending') {
-                orders = orders.filter(o => !o.workDone);
-            } else if (APP_STATE.currentFilter === 'done') {
-                orders = orders.filter(o => o.workDone);
-            }
-
-            APP_STATE.filteredOrders = orders;
-            renderWorkOrders(orders);
-        }
-
-        function renderWorkOrders(orders) {
-            const container = document.getElementById('cardContainer');
-            
-            if (orders.length === 0) {
-                showEmptyState();
-                return;
-            }
-
-            hideAllStates();
-            container.innerHTML = orders.map(order => createWorkOrderCard(order)).join('');
-        }
-
-        function createWorkOrderCard(order) {
-            // Status badge only (no background colors)
-            let statusBadge, statusText;
-            
-            if (order.paid) {
-                statusBadge = 'bg-green-100 text-green-700';
-                statusText = 'Paid';
-            } else if (order.workDone) {
-                statusBadge = 'bg-orange-100 text-orange-700';
-                statusText = 'Work Done';
-            } else {
-                statusBadge = 'bg-yellow-100 text-yellow-700';
-                statusText = 'Pending';
-            }
-
-            const imageUrl = order.image || 'https://via.placeholder.com/80x80?text=No+Image';
-            const amount = order.total * order.rate;
-            
-            const sizesHtml = Object.entries(order.sizes).map(([size, qty]) => `
-                <div class="text-center">
-                    <div class="py-1.5 text-[10px] uppercase font-bold text-gray-500 bg-gray-50">${size}</div>
-                    <div class="py-2 text-sm font-bold ${qty == 0 ? 'text-gray-300' : 'text-gray-900 dark:text-white'}">${qty}</div>
-                </div>
-            `).join('');
-
-            return `
-                <article class="group relative flex flex-col bg-white dark:bg-surface-dark rounded-2xl shadow-soft overflow-hidden border border-gray-200 dark:border-gray-700" data-row="${order.rowIndex}">
-                    <div class="p-4 flex gap-4 items-start">
-                        <div class="h-20 w-20 shrink-0 rounded-lg bg-gray-200 dark:bg-gray-800 bg-cover bg-center shadow-inner-strong cursor-pointer hover:scale-105 transition-transform" 
-                             onclick="openPhoto('${imageUrl}')"
-                             style="background-image: url('${imageUrl}');">
-                        </div>
-                        <div class="flex-1 min-w-0 space-y-0.5">
-                            <div class="flex justify-between items-start gap-2">
-                                <h2 class="text-base font-bold text-gray-900 dark:text-white">Article: ${order.article}</h2>
-                                <span class="shrink-0 inline-flex items-center rounded-md ${statusBadge} px-2 py-0.5 text-xs font-semibold">${statusText}</span>
-                            </div>
-                            <p class="text-sm text-gray-700 dark:text-gray-300"><span class="font-semibold">Colour:</span> ${order.colour}</p>
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <p class="text-sm text-gray-700 dark:text-gray-300"><span class="font-semibold">Upper:</span> ${order.upperMaterial}</p>
-                                ${order.buckleTie === 'Y' ? '<span class="px-1.5 py-0.5 rounded bg-primary/15 text-primary text-[10px] font-bold">Buckle/Tie: Y</span>' : ''}
-                            </div>
-                            <p class="text-sm text-gray-700 dark:text-gray-300"><span class="font-semibold">Lining:</span> ${order.lining}</p>
-                            <div class="flex gap-3 text-sm text-gray-700 dark:text-gray-300">
-                                <span><span class="font-semibold">Interlining:</span> ${order.interlining}</span>
-                                <span><span class="font-semibold">Counter:</span> ${order.counter}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="px-4 pb-2">
-                        <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-black/20">
-                            <div class="grid grid-cols-9 divide-x divide-gray-200 dark:divide-gray-700 text-center">
-                                ${sizesHtml}
-                                <div class="text-center bg-primary/10">
-                                    <div class="py-1.5 text-[10px] uppercase font-bold text-primary">Total</div>
-                                    <div class="py-2 text-sm font-bold text-primary">${order.total}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Rate and Amount -->
-                    <div class="px-4 pb-2">
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-gray-500">Rate: ₹${order.rate}/pair</span>
-                            <span class="font-bold text-primary">Amount: ₹${amount}</span>
-                        </div>
-                    </div>
-                    <div class="p-4 pt-2">
-                        ${order.paid ? `
-                            <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-gray-700">
-                                <div class="flex items-center gap-2 text-green-600">
-                                    <span class="material-symbols-outlined text-lg">check_circle</span>
-                                    <span class="text-sm font-semibold">Paid</span>
-                                </div>
-                            </div>
-                        ` : order.workDone ? `
-                            <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-gray-700">
-                                <div class="flex items-center gap-2 text-primary">
-                                    <span class="material-symbols-outlined text-lg">check_circle</span>
-                                    <span class="text-sm font-semibold">Work Done</span>
-                                </div>
-                            </div>
-                        ` : `
-                            <label class="checkbox-wrapper cursor-pointer flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 hover:bg-gray-100 transition-colors border border-gray-200 dark:border-gray-700">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Mark as Work Done</span>
-                                <div class="relative">
-                                    <input class="peer sr-only" type="checkbox" onchange="markWorkDone(${order.rowIndex}, this.checked)"/>
-                                    <div class="h-6 w-6 rounded-md border-2 border-gray-400 bg-transparent transition-all flex items-center justify-center">
-                                        <svg class="w-4 h-4 text-white opacity-0 transform scale-50 transition-all duration-200" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
-                                            <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
-                                        </svg>
-                                    </div>
-                                </div>
-                            </label>
-                        `}
-                    </div>
-                </article>
-            `;
-        }
-
-        // ===== Login Functions =====
-        
-        function togglePasswordVisibility() {
-            const passwordInput = document.getElementById('loginPassword');
-            const toggleIcon = document.getElementById('passwordToggleIcon');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleIcon.textContent = 'visibility_off';
-            } else {
-                passwordInput.type = 'password';
-                toggleIcon.textContent = 'visibility';
-            }
-        }
-
-        function handleLogin() {
+        // Login
+        async function handleLogin() {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const password = document.getElementById('loginPassword').value;
+            if (!email || !password) { showLoginError('Enter email and password'); return; }
             
-            if (!email) {
-                showLoginError('Please enter your email');
-                return;
-            }
-            
-            document.getElementById('loginButton').disabled = true;
-            document.getElementById('loginButtonText').textContent = 'Signing in...';
-            document.getElementById('loginSpinner').classList.remove('hidden');
+            document.getElementById('loginBtn').disabled = true;
+            document.getElementById('loginBtnText').textContent = 'Signing in...';
             document.getElementById('loginError').classList.add('hidden');
             
-            validateAndLogin(email, password);
-        }
-
-        async function validateAndLogin(email, password) {
             try {
-                const result = await callAppsScript({
-                    action: 'login',
-                    email: email,
-                    password: password
-                });
+                const result = await callAPI({ action: 'login', email, password });
+                if (!result.success) { showLoginError(result.error); resetLoginBtn(); return; }
                 
-                if (!result.success) {
-                    showLoginError(result.error);
-                    resetLoginButton();
-                    return;
-                }
-
-                const worker = result.worker;
+                APP_STATE.userType = result.userType;
+                APP_STATE.currentUser = result.user;
+                localStorage.setItem('fcSession', JSON.stringify({ userType: result.userType, user: result.user }));
                 
-                APP_STATE.currentUser = worker.email;
-                APP_STATE.workerName = worker.name;
-                APP_STATE.workerRole = worker.role;
-                APP_STATE.workerEmail = worker.email;
-                APP_STATE.advanceBalance = worker.advanceBalance || 0;
-
-                // Update UI with user info
-                document.getElementById('welcomeName').textContent = worker.name;
-                document.getElementById('menuUserName').textContent = worker.name;
-                document.getElementById('menuUserEmail').textContent = worker.email;
-                document.getElementById('settingsUserName').textContent = worker.name;
-                document.getElementById('settingsUserEmail').innerHTML = `<span class="material-symbols-outlined text-sm">mail</span> ${worker.email}`;
-                document.getElementById('settingsUserRole').textContent = worker.role;
-
-                // Save to localStorage
-                localStorage.setItem('factoryAppUser', JSON.stringify({
-                    email: worker.email,
-                    name: worker.name,
-                    role: worker.role,
-                    advanceBalance: worker.advanceBalance
-                }));
-
-                // Clear login form
-                document.getElementById('loginEmail').value = '';
-                document.getElementById('loginPassword').value = '';
-                resetLoginButton();
-
-                // Show dashboard and load work orders
-                showScreen('dashboard');
-                loadWorkOrders();
-
-            } catch (error) {
-                console.error('Login error:', error);
-                showLoginError('Failed to login. Please check your internet connection.');
-                resetLoginButton();
-            }
-        }
-        
-        function resetLoginButton() {
-            document.getElementById('loginButton').disabled = false;
-            document.getElementById('loginButtonText').textContent = 'Sign In';
-            document.getElementById('loginSpinner').classList.add('hidden');
+                resetLoginBtn();
+                if (result.userType === 'admin') showAdminDashboard();
+                else showWorkerDashboard();
+            } catch (e) { showLoginError('Login failed'); resetLoginBtn(); }
         }
 
-        function showLoginError(message) {
-            const errorDiv = document.getElementById('loginError');
-            errorDiv.textContent = message;
-            errorDiv.classList.remove('hidden');
+        function showLoginError(msg) {
+            document.getElementById('loginError').textContent = msg;
+            document.getElementById('loginError').classList.remove('hidden');
         }
-
+        function resetLoginBtn() {
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('loginBtnText').textContent = 'Sign In';
+        }
         function logout() {
-            localStorage.removeItem('factoryAppUser');
-            APP_STATE.currentUser = null;
-            APP_STATE.workerName = null;
-            APP_STATE.workerRole = null;
-            APP_STATE.advanceBalance = 0;
-            showScreen('login');
+            localStorage.removeItem('fcSession');
+            location.reload();
         }
-
-        function checkExistingLogin() {
-            const saved = localStorage.getItem('factoryAppUser');
-            if (saved) {
-                const user = JSON.parse(saved);
-                APP_STATE.currentUser = user.email;
-                APP_STATE.workerName = user.name;
-                APP_STATE.workerRole = user.role;
-                APP_STATE.workerEmail = user.email;
-                APP_STATE.advanceBalance = user.advanceBalance || 0;
-
-                document.getElementById('welcomeName').textContent = user.name;
-                document.getElementById('menuUserName').textContent = user.name;
-                document.getElementById('menuUserEmail').textContent = user.email;
-                document.getElementById('settingsUserName').textContent = user.name;
-                document.getElementById('settingsUserEmail').innerHTML = `<span class="material-symbols-outlined text-sm">mail</span> ${user.email}`;
-                document.getElementById('settingsUserRole').textContent = user.role;
-
-                showScreen('dashboard');
-                loadWorkOrders();
+        function checkSession() {
+            const s = localStorage.getItem('fcSession');
+            if (s) {
+                const d = JSON.parse(s);
+                APP_STATE.userType = d.userType;
+                APP_STATE.currentUser = d.user;
+                if (d.userType === 'admin') showAdminDashboard();
+                else showWorkerDashboard();
             }
         }
 
-        // ===== Mark Work Done =====
-        
-        async function markWorkDone(rowIndex, checked) {
-            try {
-                const checkbox = document.querySelector(`[data-row="${rowIndex}"] input[type="checkbox"]`);
-                if (checkbox) checkbox.disabled = true;
-                
-                const result = await callAppsScript({
-                    action: 'markWorkDone',
-                    rowIndex: rowIndex,
-                    status: checked
-                });
-                
-                if (!result.success) {
-                    alert('Failed to update: ' + result.error);
-                    if (checkbox) {
-                        checkbox.checked = !checked;
-                        checkbox.disabled = false;
-                    }
-                    return;
-                }
-                
-                // Update local state
-                const order = APP_STATE.workOrders.find(o => o.rowIndex === rowIndex);
-                if (order) {
-                    order.workDone = checked;
-                }
-                
-                // Refresh the display
-                filterAndDisplayOrders();
-                
-            } catch (error) {
-                console.error('Error updating work status:', error);
-                alert('Failed to update. Check your internet connection.');
-            }
+        // Admin
+        function showAdminDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('adminDashboard').classList.remove('hidden');
+            document.getElementById('adminMenuName').textContent = APP_STATE.currentUser.name;
+            document.getElementById('settingsAdminName').textContent = APP_STATE.currentUser.name;
+            document.getElementById('settingsAdminEmail').textContent = APP_STATE.currentUser.email;
+            loadAllWorkers();
+            loadAllWorkOrders();
+        }
+        function toggleAdminMenu() {
+            document.getElementById('adminMenu').classList.toggle('active');
+            document.querySelector('#adminMenu .slide-menu').classList.toggle('active');
+        }
+        function showAdminPage(page) {
+            document.querySelectorAll('.admin-page').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.admin-menu-item').forEach(b => {
+                b.classList.remove('bg-primary/10', 'text-primary');
+                b.classList.add('hover:bg-gray-100');
+            });
+            const btn = document.querySelector(`.admin-menu-item[data-page="${page}"]`);
+            if (btn) { btn.classList.add('bg-primary/10', 'text-primary'); btn.classList.remove('hover:bg-gray-100'); }
+            
+            const titles = { workOrders: 'Work Orders', workers: 'Worker Details', payments: 'Payments', articles: 'Article Details', settings: 'Settings' };
+            document.getElementById('adminPageTitle').textContent = titles[page];
+            document.getElementById('page' + page.charAt(0).toUpperCase() + page.slice(1)).classList.remove('hidden');
+            document.getElementById('fabBtn').style.display = ['workOrders','workers','payments','articles'].includes(page) ? 'flex' : 'none';
+            
+            if (page === 'workOrders') loadAllWorkOrders();
+            if (page === 'workers') loadAllWorkers();
+            if (page === 'payments') loadAllPayments();
+            toggleAdminMenu();
         }
 
-        // ===== Payment Functions =====
-        
-        async function loadPaymentHistory() {
-            document.getElementById('paymentHistoryContainer').innerHTML = '';
-            document.getElementById('paymentLoadingState').classList.remove('hidden');
-            document.getElementById('emptyPaymentState').classList.add('hidden');
+        async function loadAllWorkOrders() {
+            document.getElementById('workOrdersList').innerHTML = '';
+            document.getElementById('workOrdersLoading').classList.remove('hidden');
+            document.getElementById('workOrdersEmpty').classList.add('hidden');
             
             try {
-                // Get advance balance
-                const balanceResult = await callAppsScript({
-                    action: 'getAdvanceBalance',
-                    workerName: APP_STATE.workerName
-                });
-                
-                if (balanceResult.success) {
-                    APP_STATE.advanceBalance = balanceResult.advanceBalance;
-                    document.getElementById('advanceBalanceDisplay').textContent = '₹' + APP_STATE.advanceBalance;
-                }
-                
-                // Get payment history
-                const result = await callAppsScript({
-                    action: 'getPaymentHistory',
-                    workerName: APP_STATE.workerName
-                });
-                
-                document.getElementById('paymentLoadingState').classList.add('hidden');
-                
-                if (!result.success) {
-                    throw new Error(result.error);
-                }
-                
-                APP_STATE.paymentHistory = result.payments;
-                
-                if (result.payments.length === 0) {
-                    document.getElementById('emptyPaymentState').classList.remove('hidden');
-                    return;
-                }
-                
-                renderPaymentHistory(result.payments);
-                
-            } catch (error) {
-                console.error('Error loading payment history:', error);
-                document.getElementById('paymentLoadingState').classList.add('hidden');
-                document.getElementById('emptyPaymentState').classList.remove('hidden');
-            }
+                const result = await callAPI({ action: 'getAllWorkOrders' });
+                document.getElementById('workOrdersLoading').classList.add('hidden');
+                if (!result.success || !result.orders.length) { document.getElementById('workOrdersEmpty').classList.remove('hidden'); return; }
+                APP_STATE.workOrders = result.orders;
+                renderAdminOrders(result.orders);
+            } catch (e) { document.getElementById('workOrdersLoading').classList.add('hidden'); }
         }
 
-        function renderPaymentHistory(payments) {
-            const container = document.getElementById('paymentHistoryContainer');
+        function renderAdminOrders(orders) {
+            const uppermen = APP_STATE.workers.filter(w => w.role === 'Upperman');
+            const bottomMen = APP_STATE.workers.filter(w => w.role === 'Bottom Man');
             
-            container.innerHTML = payments.map(payment => {
-                const isAdvanceOnly = payment.payment === 0 && payment.advance > 0;
-                
+            document.getElementById('workOrdersList').innerHTML = orders.map(o => {
+                const sizes = Object.entries(o.sizes).filter(([k,v]) => v > 0).map(([k]) => k.split('/')[0]).join(', ');
                 return `
-                    <div class="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-soft border border-gray-200 dark:border-gray-700">
-                        <div class="flex justify-between items-start mb-3">
-                            <span class="text-sm font-medium text-gray-500">${payment.dateRange}</span>
-                            ${isAdvanceOnly ? '<span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded">Advance</span>' : ''}
-                        </div>
-                        <div class="space-y-2">
-                            ${payment.payment > 0 ? `
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Payment</span>
-                                    <span class="font-semibold text-gray-900">₹${payment.payment}</span>
-                                </div>
-                            ` : ''}
-                            ${payment.advance > 0 ? `
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Advance Given</span>
-                                    <span class="font-semibold text-blue-600">+₹${payment.advance}</span>
-                                </div>
-                            ` : ''}
-                            ${payment.advanceDeducted > 0 ? `
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Advance Deducted</span>
-                                    <span class="font-semibold text-orange-600">-₹${payment.advanceDeducted}</span>
-                                </div>
-                            ` : ''}
-                            <div class="flex justify-between pt-2 border-t border-gray-100">
-                                <span class="font-medium text-gray-700">Net Payment</span>
-                                <span class="font-bold text-lg ${payment.net >= 0 ? 'text-primary' : 'text-red-600'}">₹${payment.net}</span>
-                            </div>
+                <div class="order-card bg-white rounded-xl border overflow-hidden" data-row="${o.rowIndex}">
+                    <div class="p-3 cursor-pointer" onclick="toggleExpand(${o.rowIndex})">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-bold">${o.article}</span>
+                            <span class="text-gray-400">│</span>
+                            <span class="text-gray-600">${o.colour}</span>
+                            <span class="text-gray-400">│</span>
+                            <span class="text-gray-500 text-sm">${sizes || '-'}</span>
+                            <span class="ml-auto font-bold text-primary">${o.total}</span>
                         </div>
                     </div>
-                `;
+                    <div class="px-3 pb-3 flex gap-2">
+                        <select class="flex-1 px-2 py-1 text-sm border rounded-lg" onchange="assignWorker(${o.rowIndex},'upperman',this.value)">
+                            <option value="">Upperman</option>
+                            ${uppermen.map(w => `<option value="${w.name}" ${o.upperman===w.name?'selected':''}>${w.name}</option>`).join('')}
+                        </select>
+                        <select class="flex-1 px-2 py-1 text-sm border rounded-lg" onchange="assignWorker(${o.rowIndex},'bottomman',this.value)">
+                            <option value="">Bottom Man</option>
+                            ${bottomMen.map(w => `<option value="${w.name}" ${o.bottomMan===w.name?'selected':''}>${w.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="hidden border-t bg-gray-50 p-3" id="expand-${o.rowIndex}">
+                        <div class="grid grid-cols-8 gap-1 text-center text-sm">
+                            ${Object.entries(o.sizes).map(([s,q]) => `<div><div class="text-xs text-gray-500">${s}</div><div class="font-bold ${q?'':'text-gray-300'}">${q}</div></div>`).join('')}
+                        </div>
+                    </div>
+                </div>`;
             }).join('');
         }
 
-        // ===== UI Functions =====
-        
-        function showScreen(screen) {
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('dashboardScreen').classList.add('hidden');
-            document.getElementById('voiceScreen').classList.add('hidden');
-            document.getElementById('settingsScreen').classList.add('hidden');
-            document.getElementById('paymentsScreen').classList.add('hidden');
-            
-            if (screen === 'login') {
-                document.getElementById('loginScreen').classList.remove('hidden');
-            } else if (screen === 'dashboard') {
-                document.getElementById('dashboardScreen').classList.remove('hidden');
-            } else if (screen === 'voice') {
-                document.getElementById('voiceScreen').classList.remove('hidden');
-            } else if (screen === 'settings') {
-                document.getElementById('settingsScreen').classList.remove('hidden');
-            } else if (screen === 'payments') {
-                document.getElementById('paymentsScreen').classList.remove('hidden');
-                loadPaymentHistory();
+        function toggleExpand(row) {
+            const el = document.getElementById('expand-' + row);
+            const cards = document.querySelectorAll('.order-card');
+            if (APP_STATE.expandedCard === row) {
+                el.classList.add('hidden');
+                cards.forEach(c => c.classList.remove('expand-blur', 'card-expanded'));
+                APP_STATE.expandedCard = null;
+            } else {
+                if (APP_STATE.expandedCard) document.getElementById('expand-' + APP_STATE.expandedCard)?.classList.add('hidden');
+                el.classList.remove('hidden');
+                cards.forEach(c => {
+                    if (c.dataset.row == row) { c.classList.add('card-expanded'); c.classList.remove('expand-blur'); }
+                    else { c.classList.add('expand-blur'); c.classList.remove('card-expanded'); }
+                });
+                APP_STATE.expandedCard = row;
             }
         }
 
-        function toggleMenu() {
-            const overlay = document.getElementById('menuOverlay');
-            const menu = overlay.querySelector('.slide-menu');
-            overlay.classList.toggle('active');
-            menu.classList.toggle('active');
+        async function assignWorker(row, type, name) {
+            await callAPI({ action: 'assignWorker', rowIndex: row, workerType: type, workerName: name });
         }
 
-        function openPhoto(src) {
-            document.getElementById('modalPhoto').src = src;
-            document.getElementById('photoModal').classList.add('active');
-        }
-
-        function closePhoto() {
-            document.getElementById('photoModal').classList.remove('active');
-        }
-
-        function filterCards(filter) {
-            APP_STATE.currentFilter = filter;
-            
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                if (btn.dataset.filter === filter) {
-                    btn.classList.add('bg-white', 'text-primary', 'shadow-sm');
-                    btn.classList.remove('text-gray-500');
-                } else {
-                    btn.classList.remove('bg-white', 'text-primary', 'shadow-sm');
-                    btn.classList.add('text-gray-500');
+        async function loadAllWorkers() {
+            try {
+                const result = await callAPI({ action: 'getAllWorkers' });
+                if (result.success) {
+                    APP_STATE.workers = result.workers;
+                    document.getElementById('workersList').innerHTML = result.workers.map(w => `
+                        <div class="bg-white rounded-xl p-4 border flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-primary">person</span>
+                                </div>
+                                <div><p class="font-semibold">${w.name}</p><p class="text-sm text-gray-500">${w.role}</p></div>
+                            </div>
+                            ${w.paymentRequest ? '<span class="text-xl">🔔</span>' : ''}
+                        </div>
+                    `).join('');
                 }
+            } catch (e) {}
+        }
+
+        async function loadAllPayments() {
+            document.getElementById('paymentsList').innerHTML = '<div class="py-10 text-center text-gray-500">Loading...</div>';
+            try {
+                const result = await callAPI({ action: 'getAllPayments' });
+                if (result.success && result.payments.length) {
+                    document.getElementById('paymentsList').innerHTML = result.payments.map(p => `
+                        <div class="bg-white rounded-xl p-4 border">
+                            <div class="flex justify-between mb-2"><span class="font-semibold">${p.workerName}</span><span class="text-sm text-gray-500">${p.dateRange}</span></div>
+                            <div class="text-sm text-gray-600">Payment: ₹${p.payment} | Advance: ₹${p.advance} | Deducted: ₹${p.advanceDeducted}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('paymentsList').innerHTML = '<div class="py-10 text-center text-gray-500">No payments</div>';
+                }
+            } catch (e) { document.getElementById('paymentsList').innerHTML = '<div class="py-10 text-center text-red-500">Error</div>'; }
+        }
+
+        // FAB
+        function toggleFabMenu() { document.getElementById('fabMenu').classList.toggle('active'); }
+        function showAddOrderModal() { toggleFabMenu(); loadWorkersForForm(); document.getElementById('addOrderModal').classList.add('active'); }
+        function closeAddOrderModal() { document.getElementById('addOrderModal').classList.remove('active'); }
+        function loadWorkersForForm() {
+            const up = APP_STATE.workers.filter(w => w.role === 'Upperman');
+            const bm = APP_STATE.workers.filter(w => w.role === 'Bottom Man');
+            document.getElementById('orderUpperman').innerHTML = '<option value="">Not Assigned</option>' + up.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+            document.getElementById('orderBottomMan').innerHTML = '<option value="">Not Assigned</option>' + bm.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+        }
+
+        async function saveWorkOrder() {
+            const data = {
+                article: document.getElementById('orderArticle').value,
+                colour: document.getElementById('orderColour').value,
+                image: '',
+                upperMaterial: document.getElementById('orderUpper').value,
+                lining: document.getElementById('orderLining').value,
+                interlining: document.getElementById('orderInterlining').value,
+                counter: document.getElementById('orderCounter').value,
+                buckleTie: document.getElementById('orderBuckleTie').value,
+                rate: document.getElementById('orderRate').value || 0,
+                sizes: {
+                    '35/4': +document.getElementById('size35').value || 0,
+                    '36/5': +document.getElementById('size36').value || 0,
+                    '37/6': +document.getElementById('size37').value || 0,
+                    '38/7': +document.getElementById('size38').value || 0,
+                    '39/8': +document.getElementById('size39').value || 0,
+                    '40/9': +document.getElementById('size40').value || 0,
+                    '41/10': +document.getElementById('size41').value || 0,
+                    '42/11': +document.getElementById('size42').value || 0
+                },
+                upperman: document.getElementById('orderUpperman').value,
+                bottomMan: document.getElementById('orderBottomMan').value
+            };
+            data.total = Object.values(data.sizes).reduce((a,b) => a+b, 0);
+            if (!data.article) { alert('Enter article'); return; }
+            
+            const result = await callAPI({ action: 'addWorkOrder', orderData: JSON.stringify(data) });
+            if (result.success) {
+                closeAddOrderModal();
+                ['orderArticle','orderColour','orderUpper','orderLining','orderInterlining','orderCounter','orderRate'].forEach(id => document.getElementById(id).value = '');
+                ['35','36','37','38','39','40','41','42'].forEach(s => document.getElementById('size'+s).value = '0');
+                loadAllWorkOrders();
+            } else { alert('Error: ' + result.error); }
+        }
+
+        // Add Admin
+        function showAddAdminModal() { document.getElementById('addAdminModal').classList.add('active'); }
+        function closeAddAdminModal() { document.getElementById('addAdminModal').classList.remove('active'); }
+        async function saveNewAdmin() {
+            const data = {
+                name: document.getElementById('newAdminName').value,
+                email: document.getElementById('newAdminEmail').value,
+                password: document.getElementById('newAdminPassword').value
+            };
+            if (!data.name || !data.email || !data.password) { alert('Fill all fields'); return; }
+            const result = await callAPI({ action: 'addAdmin', adminData: JSON.stringify(data) });
+            if (result.success) {
+                closeAddAdminModal();
+                ['newAdminName','newAdminEmail','newAdminPassword'].forEach(id => document.getElementById(id).value = '');
+                alert('Admin added!');
+            } else { alert('Error: ' + result.error); }
+        }
+
+        // Worker
+        function showWorkerDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('workerDashboard').classList.remove('hidden');
+            APP_STATE.workerName = APP_STATE.currentUser.name;
+            APP_STATE.workerRole = APP_STATE.currentUser.role;
+            document.getElementById('welcomeName').textContent = APP_STATE.currentUser.name;
+            document.getElementById('workerMenuName').textContent = APP_STATE.currentUser.name;
+            document.getElementById('workerMenuEmail').textContent = APP_STATE.currentUser.email;
+            loadWorkerOrders();
+        }
+        function toggleWorkerMenu() {
+            document.getElementById('workerMenu').classList.toggle('active');
+            document.querySelector('#workerMenu .slide-menu').classList.toggle('active');
+        }
+        function showWorkerPage(page) {
+            document.getElementById('workerDashboard').classList.add('hidden');
+            document.getElementById('workerPayments').classList.add('hidden');
+            if (page === 'dashboard') { document.getElementById('workerDashboard').classList.remove('hidden'); }
+            else if (page === 'payments') { document.getElementById('workerPayments').classList.remove('hidden'); loadWorkerPayments(); }
+            toggleWorkerMenu();
+        }
+
+        let workerFilter = 'pending';
+        async function loadWorkerOrders() {
+            document.getElementById('workerOrdersList').innerHTML = '';
+            document.getElementById('workerLoading').classList.remove('hidden');
+            document.getElementById('workerEmpty').classList.add('hidden');
+            
+            try {
+                const result = await callAPI({ action: 'getWorkOrders', workerName: APP_STATE.workerName, role: APP_STATE.workerRole });
+                document.getElementById('workerLoading').classList.add('hidden');
+                if (!result.success || !result.orders.length) { document.getElementById('workerEmpty').classList.remove('hidden'); return; }
+                APP_STATE.workOrders = result.orders;
+                filterWorkerOrders(workerFilter);
+            } catch (e) { document.getElementById('workerLoading').classList.add('hidden'); }
+        }
+
+        function filterWorkerOrders(filter) {
+            workerFilter = filter;
+            document.querySelectorAll('.worker-filter').forEach(b => {
+                if (b.dataset.filter === filter) { b.classList.add('bg-white', 'text-primary', 'shadow-sm'); b.classList.remove('text-gray-500'); }
+                else { b.classList.remove('bg-white', 'text-primary', 'shadow-sm'); b.classList.add('text-gray-500'); }
             });
-
-            filterAndDisplayOrders();
+            let orders = APP_STATE.workOrders;
+            if (filter === 'pending') orders = orders.filter(o => !o.workDone);
+            else if (filter === 'done') orders = orders.filter(o => o.workDone);
+            renderWorkerOrders(orders);
         }
 
-        function showLoadingState() {
-            document.getElementById('cardContainer').innerHTML = '';
-            document.getElementById('emptyState').classList.add('hidden');
-            document.getElementById('errorState').classList.add('hidden');
-            document.getElementById('loadingState').classList.remove('hidden');
-            document.getElementById('loadingState').classList.add('flex');
+        function renderWorkerOrders(orders) {
+            if (!orders.length) { document.getElementById('workerOrdersList').innerHTML = ''; document.getElementById('workerEmpty').classList.remove('hidden'); return; }
+            document.getElementById('workerEmpty').classList.add('hidden');
+            document.getElementById('workerOrdersList').innerHTML = orders.map(o => {
+                const status = o.paid ? ['bg-green-100 text-green-700', 'Paid'] : o.workDone ? ['bg-orange-100 text-orange-700', 'Work Done'] : ['bg-yellow-100 text-yellow-700', 'Pending'];
+                return `
+                <article class="bg-white rounded-2xl border overflow-hidden">
+                    <div class="p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h2 class="font-bold">Article: ${o.article}</h2>
+                                <p class="text-sm text-gray-600">Colour: ${o.colour}</p>
+                                <p class="text-sm text-gray-600">Upper: ${o.upperMaterial}</p>
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold ${status[0]}">${status[1]}</span>
+                        </div>
+                    </div>
+                    <div class="px-4 pb-2">
+                        <div class="grid grid-cols-9 border rounded-lg text-center text-sm overflow-hidden">
+                            ${Object.entries(o.sizes).map(([s,q]) => `<div><div class="py-1 bg-gray-50 text-xs text-gray-500">${s}</div><div class="py-1 font-bold ${q?'':'text-gray-300'}">${q}</div></div>`).join('')}
+                            <div class="bg-primary/10"><div class="py-1 text-xs text-primary font-bold">Total</div><div class="py-1 font-bold text-primary">${o.total}</div></div>
+                        </div>
+                    </div>
+                    <div class="px-4 pb-2 flex justify-between text-sm">
+                        <span class="text-gray-500">Rate: ₹${o.rate}/pair</span>
+                        <span class="font-bold text-primary">₹${o.total * o.rate}</span>
+                    </div>
+                    <div class="p-4 pt-2">
+                        ${o.paid ? `<div class="p-3 rounded-xl bg-green-50 text-green-600 flex items-center gap-2"><span class="material-symbols-outlined">check_circle</span>Paid</div>` :
+                          o.workDone ? `<div class="p-3 rounded-xl bg-gray-50 text-primary flex items-center gap-2"><span class="material-symbols-outlined">check_circle</span>Work Done</div>` :
+                          `<label class="flex items-center justify-between p-3 rounded-xl bg-gray-50 border cursor-pointer"><span class="font-semibold">Mark as Work Done</span><input type="checkbox" class="w-5 h-5 accent-primary" onchange="markDone(${o.rowIndex},this.checked)"/></label>`}
+                    </div>
+                </article>`;
+            }).join('');
         }
 
-        function showEmptyState() {
-            document.getElementById('cardContainer').innerHTML = '';
-            document.getElementById('loadingState').classList.add('hidden');
-            document.getElementById('errorState').classList.add('hidden');
-            document.getElementById('emptyState').classList.remove('hidden');
+        async function markDone(row, done) {
+            await callAPI({ action: 'markWorkDone', rowIndex: row, status: done });
+            const o = APP_STATE.workOrders.find(x => x.rowIndex === row);
+            if (o) o.workDone = done;
+            filterWorkerOrders(workerFilter);
         }
 
-        function showErrorState() {
-            document.getElementById('cardContainer').innerHTML = '';
-            document.getElementById('loadingState').classList.add('hidden');
-            document.getElementById('emptyState').classList.add('hidden');
-            document.getElementById('errorState').classList.remove('hidden');
+        async function loadWorkerPayments() {
+            document.getElementById('workerPaymentsList').innerHTML = '<div class="py-10 text-center text-gray-500">Loading...</div>';
+            try {
+                const bal = await callAPI({ action: 'getAdvanceBalance', workerName: APP_STATE.workerName });
+                if (bal.success) document.getElementById('workerAdvanceBalance').textContent = '₹' + bal.advanceBalance;
+                
+                const result = await callAPI({ action: 'getPaymentHistory', workerName: APP_STATE.workerName });
+                if (result.success && result.payments.length) {
+                    document.getElementById('workerPaymentsList').innerHTML = result.payments.map(p => `
+                        <div class="bg-white rounded-xl p-4 border">
+                            <p class="text-sm text-gray-500 mb-2">${p.dateRange}</p>
+                            ${p.payment > 0 ? `<div class="flex justify-between"><span>Payment</span><span class="font-semibold">₹${p.payment}</span></div>` : ''}
+                            ${p.advance > 0 ? `<div class="flex justify-between"><span>Advance</span><span class="text-blue-600">+₹${p.advance}</span></div>` : ''}
+                            ${p.advanceDeducted > 0 ? `<div class="flex justify-between"><span>Deducted</span><span class="text-orange-600">-₹${p.advanceDeducted}</span></div>` : ''}
+                            <div class="flex justify-between pt-2 border-t mt-2"><span class="font-medium">Net</span><span class="font-bold text-primary">₹${p.net}</span></div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('workerPaymentsList').innerHTML = '<div class="py-10 text-center text-gray-500">No history</div>';
+                }
+            } catch (e) { document.getElementById('workerPaymentsList').innerHTML = '<div class="py-10 text-center text-red-500">Error</div>'; }
         }
 
-        function hideAllStates() {
-            document.getElementById('loadingState').classList.add('hidden');
-            document.getElementById('loadingState').classList.remove('flex');
-            document.getElementById('emptyState').classList.add('hidden');
-            document.getElementById('errorState').classList.add('hidden');
-        }
-
-        function toggleLangDropdown() {
-            document.getElementById('langDropdown').classList.toggle('active');
-        }
-
-        function selectLang(lang) {
-            document.getElementById('selectedLang').textContent = lang;
-            document.getElementById('langDropdown').classList.remove('active');
-            const checks = document.querySelectorAll('.lang-check');
-            checks.forEach(check => check.classList.add('hidden'));
-            if (lang === 'English') checks[0].classList.remove('hidden');
-            else checks[1].classList.remove('hidden');
-        }
-
-        // ===== Initialize App =====
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            checkExistingLogin();
-        });
-
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#langButton') && !e.target.closest('#langDropdown')) {
-                document.getElementById('langDropdown').classList.remove('active');
-            }
-        });
-
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed'));
-        }
+        // Init
+        document.addEventListener('DOMContentLoaded', checkSession);
+        document.addEventListener('click', e => { if (!e.target.closest('#fabBtn') && !e.target.closest('#fabMenu')) document.getElementById('fabMenu').classList.remove('active'); });
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
     </script>
-
 </body>
 </html>
